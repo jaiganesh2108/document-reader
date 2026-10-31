@@ -1,16 +1,47 @@
-# React + Vite
+# AI Virtual Teacher — React Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Clean, single-page React application for the **AI Virtual Teacher**, built with Vite and Tailwind/Vanilla CSS.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **Document Dropzone**: Drag-and-drop or file picker supporting PDF and PowerPoint (`.pptx`) presentations (up to 25MB).
+- **Slide Viewer & Navigator**: Clean slide content preview with Previous/Next controls and slide counter.
+- **Explain Slide Action**: Generates conversational 7-step pedagogical female teacher explanations.
+- **Female Voice Audio Player**:
+  - Play, Pause, and Replay controls.
+  - Shows active synthesis provider (Gemini TTS `Aoede` or Edge TTS `en-IN-NeerjaNeural`).
+  - Client-side blob caching for instant replays without network overhead.
+  - Automatically stops/pauses audio when navigating between slides.
+- **Meeting-Ready Guidance**: Displays quick tips on enabling tab/sound sharing in Google Meet and Zoom.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## Development & Build
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Install dependencies:
+```bash
+npm install
+```
+
+### Run local dev server (port 5173):
+```bash
+npm run dev
+```
+
+### Build production bundle:
+```bash
+npm run build
+```
+
+### Preview production build:
+```bash
+npm run preview
+```
+
+---
+
+## API Proxy Configuration
+
+The development server proxies `/api` requests to the FastAPI backend running on port 8000 (configured in `vite.config.js`). Ensure the backend server is running before testing API operations.
