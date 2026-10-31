@@ -1,0 +1,66 @@
+:root {
+  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-voice: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+
+  --color-bg: #f3f6f6;
+  --color-surface: #ffffff;
+  --color-border: #dbe3e4;
+  --color-border-hover: #b9c7c9;
+  --color-text-main: #12272b;
+  --color-text-muted: #51676b;
+  --color-text-light: #6f8387;
+
+  --color-primary: #0f5c63;
+  --color-primary-hover: #0a474d;
+  --color-primary-light: #e6f2f3;
+  --color-primary-border: #b4d6d9;
+
+  --color-success: #17794a;
+  --color-success-light: #e8f5ee;
+  --color-success-border: #bde0cd;
+
+  --color-warning: #b45f06;
+  --color-danger: #b42318;
+  --color-danger-light: #fef3f2;
+  --color-danger-border: #fecdca;
+
+  --color-chalk: #fff4d6; /* highlight for the teacher's words */
+  --color-chalk-ink: #4a3a0c;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(18, 39, 43, 0.06);
+  --focus-ring: 0 0 0 3px rgba(15, 92, 99, 0.35);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-family);
+  background: var(--color-bg);
+  color: var(--color-text-main);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+  color: inherit;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.1s;
+}
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+a { color: var(--color-primary); text-decoration: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
