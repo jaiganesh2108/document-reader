@@ -61,6 +61,8 @@ export default function App() {
   const totalSlides = slides.length;
   const currentExplanation = currentSlide ? explanations[currentSlide.slide_number] || "" : "";
   const isBusy = isExplaining || isPreparingVoice;
+  const [slideTitle, ...bodyLines] = (currentSlide?.content || "").trim().split("\n");
+  const slideBody = bodyLines.join("\n").trim();
   const cacheKey = currentSlide ? `${fileId}:${currentSlide.slide_number}` : "";
 
   const stopAudioPlayback = useCallback(() => {
@@ -265,7 +267,7 @@ export default function App() {
           <div className="brand-icon"><Volume2 className="icon" /></div>
           <div>
             <h1 className="brand-title">AI Virtual Teacher</h1>
-            <p className="brand-subtitle">Upload your slides and hear each one explained, in a natural voice.</p>
+            <p className="brand-subtitle">Turn any slide deck into a spoken lesson.</p>
           </div>
         </div>
         <span className="voice-tag">
@@ -294,7 +296,7 @@ export default function App() {
       <main className="main-content">
         <section className="card upload-card" aria-labelledby="upload-title">
           <div className="card-header">
-            <h2 className="card-title" id="upload-title">Upload your slides</h2>
+            <h2 className="card-title" id="upload-title"><span className="step-num">1</span>Upload your slides</h2>
             <span className="card-hint">PDF or PPTX, up to 25 MB</span>
           </div>
 
@@ -348,7 +350,7 @@ export default function App() {
           <section className="card slide-card" aria-labelledby="slide-title">
             <div className="card-header">
               <div className="slide-nav-meta">
-                <h2 className="card-title" id="slide-title">Slide</h2>
+                <h2 className="card-title" id="slide-title"><span className="step-num">2</span>Review the slide</h2>
                 <span className="slide-counter" aria-live="polite">
                   {currentSlideIndex + 1} of {totalSlides}
                 </span>
@@ -370,7 +372,8 @@ export default function App() {
             </div>
 
             <div className="slide-content-box" tabIndex={0} aria-label={`Text of slide ${currentSlideIndex + 1}`}>
-              <pre className="slide-text">{currentSlide?.content || "No text found on this slide."}</pre>
+              {slideTitle ? <h3 className="slide-title">{slideTitle}</h3> : null}
+              <pre className="slide-text">{slideBody || (slideTitle ? "" : "No text found on this slide.")}</pre>
             </div>
 
             <div className="action-row">
@@ -387,7 +390,7 @@ export default function App() {
         {totalSlides > 0 && (
           <section className="card explanation-card" aria-labelledby="explain-title">
             <div className="card-header">
-              <h2 className="card-title" id="explain-title">Teacher’s explanation</h2>
+              <h2 className="card-title" id="explain-title"><span className="step-num">3</span>Listen to the lesson</h2>
               {audioProvider && (
                 <span className="provider-tag">Voice: {audioProvider}{isAudioCached ? " (saved)" : ""}</span>
               )}
@@ -400,7 +403,12 @@ export default function App() {
                   <p>Your teacher is preparing this slide…</p>
                 </div>
               ) : currentExplanation ? (
-                <p className="explanation-text">{currentExplanation}</p>
+                <div className="teacher-row">
+                  <div className={`teacher-avatar${isPlaying ? " is-speaking" : ""}`} aria-hidden="true">
+                    <span className="wave"><i /><i /><i /><i /><i /></span>
+                  </div>
+                  <p className="explanation-text">{currentExplanation}</p>
+                </div>
               ) : (
                 <p className="placeholder-text">
                   Select <strong>Explain this slide</strong> to get a clear, classroom-style explanation.
