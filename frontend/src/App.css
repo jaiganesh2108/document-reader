@@ -202,3 +202,27 @@ kbd { font: 600 0.7rem var(--font-family); padding: 1px 6px; border-radius: 5px;
   .app-header { padding: 18px; }
   .volume { margin-left: 0; width: 100%; }
 }
+
+/* Real-time PDF content highlighting synchronized with narration */
+.stage-highlight {
+  background: rgba(244, 183, 64, 0.32);
+  color: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px rgba(244, 183, 64, 0.38);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.stage-title .stage-highlight {
+  color: #fff8db;
+}
+
+/* Real-time PDF content highlighting synchronized with narration */
+.stage-highlight {
+  background: rgba(244, 183, 64, 0.32);
+  color: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 0 0 3px rgba(244, 183, 64, 0.38);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.stage-title .stage-highlight {
+  color: #fff8db;
+}

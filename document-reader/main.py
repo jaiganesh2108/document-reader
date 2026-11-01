@@ -178,17 +178,38 @@ async def explain_slide(req: ExplainRequest):
     Generates a natural, conversational female teacher explanation for the specified slide.
     Reuses cached explanation if content has not changed.
     """
-    if not req.content or not req.content.strip():
+    content = req.content
+    if req.file_id:
+        document = document_cache.get(req.file_id)
+        if document is None:
+            raise HTTPException(status_code=404, detail="Uploaded document was not found in the document cache.")
+
+        cached_slide = next(
+            (slide for slide in document["slides"] if slide["slide_number"] == req.slide_number),
+            None,
+        )
+        if cached_slide is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Slide {req.slide_number} was not found in the uploaded document.",
+            )
+        content = cached_slide["content"]
+
+    if not content or not content.strip():
         raise HTTPException(status_code=400, detail="Slide content cannot be empty.")
 
     try:
-        explanation = explain_slide_content(
-            content=req.content,
+        res = explain_slide_content(
+            content=content,
             slide_number=req.slide_number
         )
+        explanation = res.get("explanation", str(res)) if isinstance(res, dict) else str(res)
+        segments = res.get("segments", []) if isinstance(res, dict) else []
+
         return {
             "slide_number": req.slide_number,
-            "explanation": explanation
+            "explanation": explanation,
+            "segments": segments
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Explanation generation failed: {str(e)}")

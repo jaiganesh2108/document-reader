@@ -18,7 +18,7 @@ A FastAPI and React-powered virtual teaching assistant that extracts slide conte
   - Explanations are cached per slide to prevent duplicate Gemini API calls.
 
 - **Modular Text-to-Speech (TTS) Architecture**
-  - **Primary**: **Gemini TTS** (`gemini-2.0-flash` with prebuilt female voice `Aoede` or `Kore`). Applies pedagogical speaking-style guidance for natural pauses and conversational cadence. Automatically wraps raw PCM into standard RIFF/WAV format.
+  - **Primary**: **Gemini TTS** with a prebuilt female voice (`Aoede` or `Kore`). Applies pedagogical speaking-style guidance for natural pauses and conversational cadence. Automatically wraps raw PCM into standard RIFF/WAV format.
   - **Fallback**: **Edge TTS (`en-IN-NeerjaNeural`)** — Free, expressive Indian English female neural voice with a calibrated slower speaking rate (-5%) for instructional clarity.
   - **Extensible**: Pluggable adapter architecture ready for ElevenLabs or custom neural voices without changing frontend code.
   - **In-Memory Audio Caching**: LRU-bounded cache reuses identical audio without repeated synthesis.
@@ -90,6 +90,9 @@ Configure your `.env` file:
 # Optional: Google Gemini API key for AI explanations & Gemini TTS
 # Get your free key at: https://aistudio.google.com/
 GEMINI_API_KEY=your_key_here
+
+# Gemini model for grounded explanations
+GEMINI_MODEL=gemini-3.8-flash
 
 # Default fallback voice (Edge TTS Indian English Female)
 DEFAULT_VOICE=en-IN-NeerjaNeural

@@ -12,7 +12,12 @@ if sys.platform == "win32":
 
 from pdf_reader import read_pdf
 from ppt_reader import read_ppt
-from explainer import explain_slide_content, generate_fallback_explanation, TEACHER_PROMPT
+from explainer import (
+    explain_slide_content,
+    generate_fallback_explanation,
+    semantic_chunks,
+    TEACHER_PROMPT,
+)
 from tts_engine import (
     tts_service,
     _ensure_valid_audio,
@@ -97,13 +102,13 @@ def test_text_normalization():
 
 
 def test_explanation_pedagogy():
-    """Verify teaching style prompt, fallback structure, and explanation caching."""
-    # 1. Verify prompt contains required female teacher persona instructions
-    assert "friendly, knowledgeable female teacher" in TEACHER_PROMPT
-    assert "clear Indian English" in TEACHER_PROMPT
-    assert "conversational sentences" in TEACHER_PROMPT
+    """Verify teaching style prompt, document grounding, and explanation caching."""
+    # 1. Verify prompt contains document grounding instructions
+    assert "female teacher" in TEACHER_PROMPT.lower()
+    assert "accurate" in TEACHER_PROMPT.lower()
+    assert "sequence" in TEACHER_PROMPT.lower()
 
-    # 2. Test fallback generation follows the 7-step pedagogical structure
+    # 2. Test fallback generation follows the grounded sequential structure
     sample_content = (
         "REST APIs & HTTP Methods\n"
         "- GET retrieves resources safely without side-effects\n"
@@ -111,11 +116,21 @@ def test_explanation_pedagogy():
         "- PUT updates existing entities idempotently"
     )
     fallback_exp = generate_fallback_explanation(sample_content, slide_number=2)
-    assert "slide 2" in fallback_exp.lower()
-    assert "REST APIs" in fallback_exp
-    assert "think of this like" in fallback_exp.lower() or "analogy" in fallback_exp.lower() or "real-world" in fallback_exp.lower()
-    assert "recap" in fallback_exp.lower()
-    print("[PASS] Female Educator Explanation & Fallback Generation verified.")
+    exp_text = str(fallback_exp)
+    assert "slide 2" in exp_text.lower()
+    assert "REST APIs" in exp_text
+    assert "GET" in exp_text
+    assert "POST" in exp_text
+    assert "PUT" in exp_text
+    assert "Concept " not in exp_text
+    assert "Point " not in exp_text
+    assert len(fallback_exp.segments) >= 4, "Must have segments for title and each bullet"
+    chunks = semantic_chunks(sample_content)
+    assert [chunk["chunk_id"] for chunk in chunks] == ["chunk-1", "chunk-2", "chunk-3", "chunk-4"]
+    assert [chunk["line_index"] for chunk in chunks] == [-1, 0, 1, 2]
+    assert all(segment["chunk_id"] for segment in fallback_exp.segments)
+    assert all(segment["timing_weight"] > 0 for segment in fallback_exp.segments)
+    print("[PASS] Female Educator Grounded Explanation & Fallback Generation verified.")
 
     # 3. Test in-memory explanation caching
     exp1 = explain_slide_content(sample_content, slide_number=2)

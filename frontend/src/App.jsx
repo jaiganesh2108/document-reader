@@ -23,19 +23,119 @@ const splitSlide = (content = "") => {
   return { title, body: rest.join("\n").trim() };
 };
 
+function buildFallbackSegments(content = "", explanation = "") {
+  if (!content) return [];
+  const lines = content.trim().split("\n");
+  const title = lines[0]?.trim() || "";
+  const bodyLines = lines.slice(1);
+
+  const items = [];
+  if (title) {
+    items.push({ type: "title", text: title, lineIndex: -1 });
+  }
+  bodyLines.forEach((l, idx) => {
+    if (l.trim()) {
+      items.push({ type: "body", text: l.trim(), lineIndex: idx });
+    }
+  });
+
+  if (items.length === 0) return [];
+
+  const sentences = (explanation || "").match(/[^.!?]+[.!?]+/g) || [explanation || ""];
+  const cleaned = sentences.map((s) => s.trim()).filter(Boolean);
+  const totalSentences = cleaned.length || 1;
+  const totalItems = items.length;
+
+  return items.map((item, i) => {
+    const start = Math.floor((i * totalSentences) / totalItems);
+    const end = Math.floor(((i + 1) * totalSentences) / totalItems);
+    const slice = cleaned.slice(start, Math.max(start + 1, end));
+    return {
+      ...item,
+      narration: slice.join(" ") || item.text
+    };
+  });
+}
+
+function alignSegmentToRenderedSlide(segment, content = "") {
+  const rawLineIndex = segment.line_index ?? segment.lineIndex;
+  if (segment.type !== "body" || !Number.isInteger(rawLineIndex)) {
+    return { ...segment, lineIndex: rawLineIndex };
+  }
+
+  const rawBodyLines = content.trim().split("\n").slice(1);
+  const leadingEmptyLines = rawBodyLines.findIndex((line) => line.trim());
+  const offset = leadingEmptyLines < 0 ? 0 : leadingEmptyLines;
+  return { ...segment, lineIndex: Math.max(0, rawLineIndex - offset) };
+}
+
+function ExplanationText({ explanation, segments, activeSegment, presentation = false }) {
+  if (!segments || segments.length === 0) {
+    return <p className={presentation ? undefined : "explanation-text"}>{explanation}</p>;
+  }
+
+  return (
+    <p className={presentation ? undefined : "explanation-text"}>
+      {segments.map((segment, index) => {
+        const narration = segment.narration || segment.text || "";
+        const isActive = activeSegment?.chunk_id === segment.chunk_id;
+        return (
+          <span key={segment.chunk_id || index}>
+            {isActive ? <span className="stage-highlight">{narration}</span> : narration}
+            {index < segments.length - 1 ? " " : ""}
+          </span>
+        );
+      })}
+    </p>
+  );
+}
+
 // Text scales with the stage (cqw units); long slides step down so nothing is cut off.
 const sizeClass = (n = 0) => (n < 180 ? "lg" : n < 380 ? "md" : n < 700 ? "sm" : n < 1100 ? "xs" : "xxs");
 
 /* ---------- Reusable pieces ---------- */
 
-function SlideStage({ slide, index, total, fill }) {
+function SlideStage({ slide, index, total, fill, activeHighlight }) {
   const { title, body } = splitSlide(slide?.content);
+  const bodyLines = body ? body.split("\n") : [];
+  const isTitleHighlighted = activeHighlight?.type === "title";
+
   return (
     <div className="stage-frame">
       <div className={`stage size-${sizeClass((slide?.content || "").length)}${fill ? " fill" : ""}`}>
         <div className="stage-slide">
-          {title ? <h2 className="stage-title">{title}</h2> : null}
-          <pre className="stage-body">{body || (title ? "" : "No text found on this slide.")}</pre>
+          {title ? (
+            <h2 className="stage-title">
+              {isTitleHighlighted ? (
+                <span className="stage-highlight">{title}</span>
+              ) : (
+                title
+              )}
+            </h2>
+          ) : null}
+          <pre className="stage-body">
+            {bodyLines.length > 0 ? (
+              bodyLines.map((line, idx) => {
+                const isLineHighlighted =
+                  activeHighlight?.type === "body" &&
+                  activeHighlight?.lineIndex === idx;
+                return (
+                  <span key={idx}>
+                    {isLineHighlighted ? (
+                      <span className="stage-highlight">{line}</span>
+                    ) : (
+                      line
+                    )}
+                    {idx < bodyLines.length - 1 ? "\n" : ""}
+                  </span>
+                );
+              })
+            ) : title ? (
+              ""
+            ) : (
+              "No text found on this slide."
+            )}
+          </pre>
         </div>
         <span className="stage-count">{index + 1} / {total}</span>
       </div>
@@ -93,6 +193,8 @@ export default function App() {
   const [slides, setSlides] = useState([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [explanations, setExplanations] = useState({});
+  const [slideSegments, setSlideSegments] = useState({});
+  const [activeHighlight, setActiveHighlight] = useState(null);
 
   const [isUploading, setIsUploading] = useState(false);
   const [isExplaining, setIsExplaining] = useState(false);
@@ -116,10 +218,16 @@ export default function App() {
   const audioRef = useRef(null);
   const fileInputRef = useRef(null);
   const audioCache = useRef(new Map());
+  const activeHighlightRef = useRef(null);
+  const syncFrameRef = useRef(null);
 
   const currentSlide = slides[currentSlideIndex] || null;
   const totalSlides = slides.length;
   const currentExplanation = currentSlide ? explanations[currentSlide.slide_number] || "" : "";
+  const currentSegments = currentSlide
+    ? slideSegments[currentSlide.slide_number] ||
+      buildFallbackSegments(currentSlide.content, currentExplanation)
+    : [];
   const isBusy = isExplaining || isPreparingVoice;
   const isPaused = hasAudio && !isPlaying && progress > 0;
   const cacheKey = currentSlide ? `${fileId}:${currentSlide.slide_number}` : "";
@@ -127,8 +235,14 @@ export default function App() {
   const stopAudioPlayback = useCallback(() => {
     const a = audioRef.current;
     if (a) { a.pause(); a.currentTime = 0; }
+    if (syncFrameRef.current !== null) {
+      cancelAnimationFrame(syncFrameRef.current);
+      syncFrameRef.current = null;
+    }
     setIsPlaying(false);
     setProgress(0);
+    activeHighlightRef.current = null;
+    setActiveHighlight(null);
   }, []);
 
   const clearAudioCache = useCallback(() => {
@@ -140,6 +254,7 @@ export default function App() {
   // Slide change: stop and restore this slide's saved audio, if any
   useEffect(() => {
     stopAudioPlayback();
+    setActiveHighlight(null);
     const entry = audioCache.current.get(cacheKey);
     const a = audioRef.current;
     if (entry && a) { a.src = entry.url; setHasAudio(true); }
@@ -150,13 +265,15 @@ export default function App() {
 
   useEffect(() => {
     const cache = audioCache.current;
-    return () => { audioRef.current?.pause(); cache.forEach(({ url }) => URL.revokeObjectURL(url)); cache.clear(); };
+    const audio = audioRef.current;
+    return () => { audio?.pause(); cache.forEach(({ url }) => URL.revokeObjectURL(url)); cache.clear(); };
   }, []);
 
   const resetDocument = (id, name, newSlides) => {
     stopAudioPlayback(); clearAudioCache();
     setFileId(id); setFileName(name); setSlides(newSlides);
     setCurrentSlideIndex(0); setExplanations({});
+    setSlideSegments({}); setActiveHighlight(null);
   };
 
   const handleUploadFile = async (file) => {
@@ -177,7 +294,7 @@ export default function App() {
     } finally { setIsUploading(false); }
   };
 
-  const handleLoadSample = () => { setErrorMessage(""); resetDocument("sample-doc-01", "Cloud_Computing_Overview.pdf", SAMPLE_SLIDES); };
+  const handleLoadSample = () => { setErrorMessage(""); resetDocument(null, "Cloud_Computing_Overview.pdf", SAMPLE_SLIDES); };
 
   const handleDrop = (e) => { e.preventDefault(); setIsDragging(false); if (!isUploading) handleUploadFile(e.dataTransfer.files?.[0]); };
 
@@ -195,6 +312,12 @@ export default function App() {
       if (!response.ok) throw new Error(await readError(response, "Failed to generate explanation."));
       const data = await response.json();
       setExplanations((prev) => ({ ...prev, [slideNum]: data.explanation }));
+      if (data.segments && data.segments.length > 0) {
+        const alignedSegments = data.segments.map((segment) =>
+          alignSegmentToRenderedSlide(segment, currentSlide.content)
+        );
+        setSlideSegments((prev) => ({ ...prev, [slideNum]: alignedSegments }));
+      }
       return data.explanation;
     } catch (err) {
       setErrorMessage(err.message || "Failed to generate the explanation.");
@@ -280,6 +403,79 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
+  const updateAudioProgress = useCallback((currentTime, duration) => {
+    if (!duration || duration <= 0) {
+      setProgress(0);
+      return;
+    }
+    setProgress((currentTime / duration) * 100);
+
+    const currentSlideNum = currentSlide?.slide_number;
+    const segments =
+      slideSegments[currentSlideNum] ||
+      buildFallbackSegments(currentSlide?.content, currentExplanation);
+
+    if (!segments || segments.length === 0) {
+      setActiveHighlight(null);
+      return;
+    }
+
+    const weights = segments.map((segment) => Math.max(
+      1,
+      segment.timing_weight || (segment.narration || segment.text || "").split(/\s+/).length
+    ));
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    if (totalWeight === 0) return;
+
+    const currentTimeClamped = Math.min(Math.max(currentTime, 0), Math.max(duration - 0.001, 0));
+    let accumulated = 0;
+    let active = segments[0];
+
+    for (let i = 0; i < segments.length; i++) {
+      const segmentDuration = (weights[i] / totalWeight) * duration;
+      if (currentTimeClamped < accumulated + segmentDuration) {
+        active = segments[i];
+        break;
+      }
+      accumulated += segmentDuration;
+    }
+
+    const previous = activeHighlightRef.current;
+    const changed = !previous ||
+      previous.chunk_id !== active.chunk_id ||
+      previous.lineIndex !== active.lineIndex ||
+      previous.type !== active.type;
+    if (changed) {
+      activeHighlightRef.current = active;
+      setActiveHighlight(active);
+    }
+  }, [currentSlide, currentExplanation, slideSegments]);
+
+  const activeExplanationSegment = isPlaying || activeHighlight
+    ? currentSegments.find((segment) => segment.chunk_id === activeHighlight?.chunk_id)
+    : null;
+
+  const stopHighlightSync = useCallback(() => {
+    if (syncFrameRef.current !== null) {
+      cancelAnimationFrame(syncFrameRef.current);
+      syncFrameRef.current = null;
+    }
+  }, []);
+
+  const startHighlightSync = useCallback(() => {
+    stopHighlightSync();
+    const sync = () => {
+      const audio = audioRef.current;
+      if (!audio || audio.paused || audio.ended) {
+        syncFrameRef.current = null;
+        return;
+      }
+      updateAudioProgress(audio.currentTime, audio.duration);
+      syncFrameRef.current = requestAnimationFrame(sync);
+    };
+    sync();
+  }, [stopHighlightSync, updateAudioProgress]);
+
   const transport = {
     isPlaying, isPaused, isBusy, hasExplanation: !!currentExplanation, progress, volume, muted,
     onPlay: handlePlay, onPause: handlePause, onStop: stopAudioPlayback,
@@ -290,9 +486,24 @@ export default function App() {
 
   const audioEl = (
     <audio ref={audioRef} preload="auto" style={{ display: 'none' }}
-      onEnded={() => { setIsPlaying(false); setProgress(0); }}
-      onPause={() => setIsPlaying(false)} onPlay={() => setIsPlaying(true)}
-      onTimeUpdate={(e) => { const { currentTime, duration } = e.currentTarget; if (duration) setProgress((currentTime / duration) * 100); }} />
+      onEnded={() => {
+        stopHighlightSync();
+        setIsPlaying(false);
+        setProgress(0);
+        activeHighlightRef.current = null;
+        setActiveHighlight(null);
+      }}
+      onPause={() => { stopHighlightSync(); setIsPlaying(false); }}
+      onPlay={() => {
+        setIsPlaying(true);
+        startHighlightSync();
+      }}
+      onLoadedMetadata={(e) => updateAudioProgress(e.currentTarget.currentTime, e.currentTarget.duration)}
+      onSeeked={(e) => updateAudioProgress(e.currentTarget.currentTime, e.currentTarget.duration)}
+      onTimeUpdate={(e) => {
+        const { currentTime, duration } = e.currentTarget;
+        updateAudioProgress(currentTime, duration);
+      }} />
   );
 
   /* ----- Student / presentation view: slide and captions only ----- */
@@ -301,7 +512,7 @@ export default function App() {
     return (
       <>
       <div className="present" onMouseMove={revealBar} onClick={revealBar}>
-        <SlideStage fill slide={currentSlide} index={currentSlideIndex} total={totalSlides} />
+        <SlideStage fill slide={currentSlide} index={currentSlideIndex} total={totalSlides} activeHighlight={activeHighlight} />
         <aside className="present-side" aria-label="Explanation">
           <div className="side-head">
             <span>Teacher’s explanation</span>
@@ -311,7 +522,12 @@ export default function App() {
             {isBusy ? (
               <p className="side-empty"><span className="spinner spinner-light" />{isExplaining ? "Preparing the explanation…" : "Preparing the voice…"}</p>
             ) : captions && currentExplanation ? (
-              <p>{currentExplanation}</p>
+              <ExplanationText
+                explanation={currentExplanation}
+                segments={currentSegments}
+                activeSegment={activeExplanationSegment}
+                presentation
+              />
             ) : (
               <p className="side-empty">{captions ? "The teacher will explain this slide shortly." : "Captions are off."}</p>
             )}
@@ -401,7 +617,7 @@ export default function App() {
           </aside>
 
           <section className="stage-column" aria-label="Slide preview">
-            <SlideStage slide={currentSlide} index={currentSlideIndex} total={totalSlides} />
+            <SlideStage slide={currentSlide} index={currentSlideIndex} total={totalSlides} activeHighlight={activeHighlight} />
             <p className="preview-note">Preview shows the text extracted from each slide, not the original page layout.</p>
 
             <div className="card control-panel" aria-label="Teacher controls">
@@ -412,7 +628,13 @@ export default function App() {
               <TransportControls t={transport} />
               <div className="explain-box" aria-live="polite" aria-busy={isExplaining}>
                 {isExplaining ? <span className="loading-state"><span className="spinner" />Writing the explanation…</span>
-                  : currentExplanation ? <p className="explanation-text">{currentExplanation}</p>
+                  : currentExplanation ? (
+                    <ExplanationText
+                      explanation={currentExplanation}
+                      segments={currentSegments}
+                      activeSegment={activeExplanationSegment}
+                    />
+                  )
                   : <p className="placeholder-text">Press <strong>Explain &amp; play</strong> and the teacher will explain this slide aloud.</p>}
               </div>
               <details className="howto">
