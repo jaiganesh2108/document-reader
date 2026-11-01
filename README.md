@@ -17,8 +17,11 @@ This full-stack application provides:
    - **Modular Extensibility**: Pluggable adapter architecture ready for ElevenLabs without modifying frontend code.
 4. **Dual-Layer Caching**: Reuses cached explanations and audio blobs both on the client and server to eliminate redundant LLM and TTS requests.
 5. **Meeting-Ready Audio Playback**: Direct browser `<audio>` playback optimized for Google Meet and Zoom tab/window screen sharing with audio.
+   
+<img width="600" height="400" alt="image" src="https://github.com/user-attachments/assets/20b7df98-35ac-4298-8257-a9329bfef945" />
 
 ---
+
 
 ## 🏗️ Project Architecture
 
